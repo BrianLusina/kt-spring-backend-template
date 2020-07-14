@@ -1,0 +1,262 @@
+version: 2.1
+executors:
+  jdk-executor:
+    docker:
+      - image: circleci/openjdk:8-jdk
+    working_directory: ~/events-api
+
+  docker-executor:
+    docker:
+      - image: docker:17.05.0-ce-git
+    environment:
+      MAVEN_OPTS: -Xmx3200m
+    working_directory: ~/events-api
+
+  node-executor:
+    docker:
+      - image: circleci/node:10
+    working_directory: ~/events-api
+
+jobs:
+  dependencies:
+    executor: jdk-executor
+    steps:
+      - checkout
+      - restore_cache:
+          key: EventsApi-{{ checksum "build.gradle.kts" }}-{{ .Branch }}
+          keys:
+            - EA-{{ checksum "build.gradle.kts" }}
+
+      - run:
+          name: Download dependencies
+          command: ./gradlew dependencies
+
+      - save_cache:
+          key: EventsApi-{{ checksum "build.gradle.kts" }}-{{ .Branch }}
+          paths: ~/.gradle
+          keys:
+            - EA-{{ checksum "build.gradle.kts" }}
+      - persist_to_workspace:
+          root: .
+          paths: .
+
+  test:
+    executor: jdk-executor
+    steps:
+      - attach_workspace:
+          at: .
+      - restore_cache:
+          key: EventsApi-{{ checksum "build.gradle.kts" }}-{{ .Branch }}
+          keys:
+            - EA-{{ checksum "build.gradle.kts" }}
+
+      - run:
+          name: Run linting (Check Kotlin code style)
+          command: ./gradlew detekt
+
+      - run:
+          name: Run unit tests
+          command: ./gradlew test
+
+      - run:
+          name: Run test coverage
+          command: ./gradlew jacocoTestReport
+
+      - run:
+          name: Save test metadata
+          command: |
+            mkdir -p ~/junit/
+            find . -type f -regex ".*build/test-results/*.xml" -exec cp {} ~/junit/ \;
+          when: always
+
+      - store_test_results:
+          path: ./build/test-results/
+
+      - store_test_results:
+          path: ~/junit
+
+      - store_artifacts:
+          path: ./reports/tests/
+          destination: test-results
+
+      - store_artifacts:
+          path: ./reports/coverage/
+          destination: coverage
+
+      - store_artifacts:
+          path: ~/junit
+
+      - persist_to_workspace:
+          root: .
+          paths: .
+
+  build:
+    executor: jdk-executor
+    steps:
+      - attach_workspace:
+          at: .
+      - restore_cache:
+          key: EventsApi-{{ checksum "build.gradle.kts" }}-{{ .Branch }}
+          keys:
+            - EA-{{ checksum "build.gradle.kts" }}
+
+      - run:
+          name: Build application
+          command: ./gradlew app:bootJar
+
+      - run:
+          name: Copy integration service build artifacts
+          command: ./gradlew copyApplicationBuild
+
+      - store_artifacts:
+          path: ./app/build/libs/
+          destination: app
+
+      - store_artifacts:
+          path: ./core/build/libs/
+          destination: app
+
+      - store_artifacts:
+          path: ./database/build/libs/
+          destination: app
+
+      - store_artifacts:
+          path: ./services/build/libs/
+          destination: app
+
+      - store_artifacts:
+          path: ./api/build/libs/
+          destination: app
+
+      - persist_to_workspace:
+          root: .
+          paths: .
+
+  build_docker_image:
+    executor: jdk-executor
+    steps:
+      - setup_remote_docker
+      - attach_workspace:
+          at: .
+
+      - run:
+          name: Build application Docker image
+          command: |
+            docker build -t thelusina/events-api:$CIRCLE_SHA1 .
+            docker build -f Dockerfile-jobs -t thelusina/events-api-jobs:$CIRCLE_SHA1 .
+      - run:
+          name: Save application Docker image
+          command: |
+            docker save -o events-api-image.tar thelusina/events-api:$CIRCLE_SHA1
+            docker save -o events-api-jobs-image.tar thelusina/events-api-jobs:$CIRCLE_SHA1
+      - persist_to_workspace:
+          root: .
+          paths: .
+
+  push_latest:
+    executor: docker-executor
+    steps:
+      - setup_remote_docker
+      - attach_workspace:
+          at: .
+
+      - run:
+          name: Load application Docker image
+          command: |
+            docker load --input events-api-image.tar
+            docker load --input events-api-jobs-image.tar
+      - run:
+          name: Tag docker image
+          command: |
+            docker tag thelusina/events-api:$CIRCLE_SHA1 thelusina/events-api:latest
+            docker tag thelusina/events-api-jobs:$CIRCLE_SHA1 thelusina/events-api-jobs:latest
+      - run:
+          name: Push application Docker image
+          command: |
+            docker login -u $DOCKER_USER -p $DOCKER_PASS
+            docker push thelusina/events-api:$CIRCLE_SHA1
+            docker push thelusina/events-api:latest
+            docker push thelusina/events-api-jobs:$CIRCLE_SHA1
+            docker push thelusina/events-api-jobs:latest
+  push_production:
+    executor: docker-executor
+    steps:
+      - setup_remote_docker
+      - attach_workspace:
+          at: .
+
+      - run:
+          name: Load application Docker image
+          command: |
+            docker load --input events-api-image.tar
+            docker load --input events-api-jobs-image.tar
+      - run:
+          name: Tag docker image
+          command: |
+            docker tag thelusina/events-api:$CIRCLE_SHA1 thelusina/events-api:production
+            docker tag thelusina/events-api-jobs:$CIRCLE_SHA1 thelusina/events-api-jobs:production
+      - run:
+          name: Push application Docker image
+          command: |
+            docker login -u $DOCKER_USER -p $DOCKER_PASS
+            docker push thelusina/events-api:$CIRCLE_SHA1
+            docker push thelusina/events-api:production
+            docker push thelusina/events-api-jobs:$CIRCLE_SHA1
+            docker push thelusina/events-api-jobs:production
+  publish_release:
+    executor: node-executor
+    steps:
+      - attach_workspace:
+          at: .
+
+      - run:
+          name: Publish release
+          command: npx semantic-release
+
+workflows:
+  version: 2
+  test_build_push_tag:
+    jobs:
+      - dependencies
+      - test:
+          requires:
+            - dependencies
+      - build:
+          requires:
+            - test
+
+      - build_docker_image:
+          filters:
+            branches:
+              only:
+                - develop
+                - master
+          requires:
+            - build
+
+      - push_latest:
+          context: cerberus-context
+          filters:
+            branches:
+              only:
+                - develop
+          requires:
+            - build_docker_image
+
+      - push_production:
+          context: cerberus-context
+          filters:
+            branches:
+              only:
+                - master
+          requires:
+            - build_docker_image
+
+      - publish_release:
+          context: cerberus-context
+          filters:
+            branches:
+              only:
+                - master
+          requires:
+            - push_production

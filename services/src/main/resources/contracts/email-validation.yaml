@@ -1,0 +1,130 @@
+# https://imdigitalfactory.atlassian.net/wiki/spaces/FCBSAD/pages/1193967741/Email+Validation
+openapi: 3.0.1
+info:
+  title: API to Validate Email Address and Return Customer Details
+  description: API to Validate Email Address and Return Customer Details
+  version: 1.0.0
+servers:
+  - url: "https://192.168.205.135:2284/KECBSRESTService/1.0"
+paths:
+  /ValidateEmail:
+    get:
+      tags:
+        - "ValidateEmail"
+      summary: "API to Validate Email Address and Return Customer Details"
+      description: "API to Validate Email Address and Return Customer Details"
+      operationId: "ValidateEmail"
+      parameters:
+        - name: emailId
+          in: query
+          description: Valid Email Address
+          required: true
+          schema:
+            type: string
+        - name: requestRefNum
+          in: header
+          description: Request reference number
+          required: true
+          schema:
+            type: string
+            minLength: 12
+            maxLength: 12
+        - name: channelId
+          in: header
+          description: Channel ID as defined
+          required: true
+          schema:
+            type: string
+            enum:
+              - DBS
+            default: DBS
+      responses:
+        200:
+          description: "Successful response"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/customer'
+          headers:
+            'X-Total-Count':
+              $ref: '#/components/headers/xTotalCount'
+        400:
+          description: "Error response"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        422:
+          description: "Error response"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+        500:
+          description: "Error response"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/error'
+      security:
+        - OAuth2:
+            - read
+components:
+  headers:
+    xTotalCount:
+      schema:
+        type: integer
+        description: Total Number of records
+  schemas:
+    customer:
+      type: object
+      properties:
+        customerId:
+          type: string
+          description: Customer ID
+        firstName:
+          type: string
+          description: Customer First Name
+        middleName:
+          type: string
+          description: Customer Middle Name
+        lastName:
+          type: string
+          description: Customer Last Name
+        phoneNo:
+          type: string
+          description: Phone Number
+    error:
+      type: object
+      properties:
+        responseCode:
+          type: string
+          description: "response code\n
+          * E000 - Success\n
+          * E001 - No Records Found\n
+          * E002 - Missing Parameters\n
+          * E003 - Invalid Account Number\n
+          * E004 - Invalid Custiomer ID\n
+          * E005 - Invalid Parameters\n
+          * 9999 - System Error"
+          enum:
+            - E000
+            - E001
+            - E002
+            - E003
+            - E004
+            - E005
+            - 9999
+        responseMessage:
+          type: string
+          description: response message
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://192.168.205.135:2284/BackbaseOAuthToken/1.0/
+          scopes:
+            read: Grants read access

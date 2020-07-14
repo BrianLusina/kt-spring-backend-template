@@ -1,0 +1,18 @@
+server:
+  port: 7070
+
+spring:
+  devtools:
+    add-properties: false
+  jpa:
+    hibernate:
+      ddl: validate
+  datasource:
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/events}
+    username: ${SPRING_DATASOURCE_USERNAME:events-user}
+    password: ${SPRING_DATASOURCE_PASSWORD:events-pass}
+
+logging:
+  level:
+    root: INFO
