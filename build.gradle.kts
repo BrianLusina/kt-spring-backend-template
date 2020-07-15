@@ -165,13 +165,13 @@ tasks.withType<Wrapper> {
 val copyApplicationBuild by tasks.registering(Copy::class) {
     group = "build"
     description = "Copies app build from app/config/build to $rootDir/app/build"
-    from("$rootDir/app/config/build/.") {
+    from("$rootDir/app/build/.") {
         include("**/*")
-        rename("config-(.*).jar", "omni-registration-service-$1.jar")
+        rename("app-(.*).jar", "events-api-service-$1.jar")
     }
-    into("$rootDir/app/build/")
-    dependsOn.add(setOf("app:config:bootJar"))
-    mustRunAfter(":app:config:bootJar")
+    into("$rootDir/build/")
+    dependsOn.add(setOf("app:bootJar"))
+    mustRunAfter(":app:bootJar")
     doLast {
         logger.info(">> Done Copying app build")
     }
