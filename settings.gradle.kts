@@ -1,4 +1,4 @@
-rootProject.name = "Events API"
+rootProject.name = "events-api"
 rootProject.buildFileName = "build.gradle.kts"
 
 include(

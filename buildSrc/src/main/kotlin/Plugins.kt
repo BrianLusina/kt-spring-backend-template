@@ -13,8 +13,9 @@ object Plugins {
     const val jacocoVersion = "0.8.5"
     const val jacocoPlugin = "org.jacoco:org.jacoco.core:$jacocoVersion"
 
-    const val dokkaVersion = "0.10.1"
-    const val dokkaGradlePlugin = "org.jetbrains.dokka:dokka-gradle-plugin:$dokkaVersion"
+    const val dokkaPluginVersion = "0.10.1"
+    const val dokkaGradlePlugin = "org.jetbrains.dokka:dokka-gradle-plugin"
+    const val dokkaPlugin = "org.jetbrains.dokka"
 
     const val detektPluginVersion = "1.9.1"
     const val detektPlugin = "io.gitlab.arturbosch.detekt"

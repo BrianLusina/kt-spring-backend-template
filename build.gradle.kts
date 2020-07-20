@@ -28,6 +28,8 @@ plugins {
     jacoco
     id(Plugins.detektPlugin) version Plugins.detektPluginVersion
     id(Plugins.palantirDockerPlugin) version Plugins.palantirDockerPluginVersion
+    id(Plugins.sonarQubePlugin) version Plugins.sonarQubePluginVersion
+    id(Plugins.dokkaPlugin) version Plugins.dokkaPluginVersion
 }
 
 apply(from = "githooks.gradle.kts")
@@ -80,7 +82,7 @@ subprojects {
             xml.isEnabled = false
             html.isEnabled = true
             html.destination =
-                file(project.rootDir.resolve("$buildDir/reports/coverage/$moduleName-coverage-report.html"))
+                file(project.rootDir.resolve("$buildDir/reports/coverage"))
         }
         dependsOn("test")
     }
@@ -101,7 +103,7 @@ subprojects {
         }
         reports {
             html.isEnabled = true
-            html.destination = file(project.rootDir.resolve("$buildDir/reports/tests/$moduleName-test-report.html"))
+            html.destination = file(project.rootDir.resolve("$buildDir/reports/tests"))
         }
     }
 
@@ -179,5 +181,17 @@ val copyApplicationBuild by tasks.registering(Copy::class) {
 
 // ref https://github.com/palantir/gradle-docker
 docker {
-    name = "hub.docker.com/username/my-app:version"
+    name = "${System.getenv("CI_REGISTRY") ?: "thelusina"}/events-api"
+    setDockerfile(file("Dockerfile"))
+    copySpec.from("app/build/libs/app-0.0.1-SNAPSHOT.jar").into("build")
+    buildArgs(mapOf("JAR_FILE" to "build/app-0.0.1-SNAPSHOT.jar"))
+}
+
+// ref https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-gradle/
+sonarqube {
+    properties {
+        property("sonar.host.url", System.getenv("SONAR_SERVER_URL") ?: "http:localhost:9000")
+        property("sonar.projectDescription", "BookKeeping API Service")
+        property("sonar.java.coveragePlugin", "jacoco")
+    }
 }
